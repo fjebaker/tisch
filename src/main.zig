@@ -28,7 +28,7 @@ pub const Row = struct {
     }
 
     pub fn insertColumn(self: *Self, item: []const u8, index: usize) !void {
-        // allocator new storage and then copy over the pointers
+        // allocate new storage and then copy over the pointers
         var new_items = try self.allocator.alloc([]u8, self.items.len + 1);
         errdefer self.allocator.free(new_items);
 
@@ -142,7 +142,6 @@ pub fn TableBase(
                 }
             }
 
-            // print header column
             var spacings = try self.getColumnSpacings();
             defer self.allocator.free(spacings);
 
