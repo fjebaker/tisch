@@ -171,6 +171,10 @@ Add the project as a zig dependency in your `build.zig.zon`:
 Initialize a table with some headings, and then add as many rows as you need. Rows are simply `[][]const u8`, which are copied by the table.
 
 ```zig
+const tisch = @import("tisch");
+const Table = tisch.Table;
+
+
 var headings = [_][]const u8{ "Heading 1", "2", "Heading 3" };
 var table = try Table.initWithHeadings(allocator, &headings);
 defer table.deinit();
