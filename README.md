@@ -159,14 +159,7 @@ var str = try table.toString(.{
 
 ## Usage
 
-Add the project as a zig dependency in your `build.zig.zon`:
-
-```
-.tisch = .{
-    .url = "https://github.com/fjebaker/tisch/archive/beb857d1ff0e07f2f7e7fba1d062ab14ec4e72ed.tar.gz",
-    .hash = "12203936911877a263a42a07f057af64cdd8116cd5ead823c84ce7ad1b56e5175754",
-}
-```
+Add the project as a zig dependency in your `build.zig.zon` and add the module to your project.
 
 Initialize a table with some headings, and then add as many rows as you need. Rows are simply `[][]const u8`, which are copied by the table.
 
