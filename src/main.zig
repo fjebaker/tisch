@@ -134,7 +134,7 @@ pub fn TableBase(
                 // insert a phony column into each row
                 try self.headings.insertColumn(opts.index_str, 0);
                 // integer formatting buffer
-                var buffer: [1024]u8 = undefined;
+                var buffer: [64]u8 = undefined;
                 for (self.rows.items, 1..) |*row, i| {
                     const size = std.fmt.formatIntBuf(&buffer, i, 10, .lower, .{});
                     const i_str = buffer[0..size];
@@ -402,25 +402,21 @@ pub const AsciiTable = TableBase(
 test "basic-operations" {
     const allocator = std.testing.allocator;
 
-    var headings = [_][]const u8{ "Heading 1", "Head 2", "Heading 3" };
+    var headings = [_][]const u8{ "Heading 1", "2", "Heading 3" };
     var table = try Table.initWithHeadings(allocator, &headings);
     defer table.deinit();
 
-    var row = [_][]const u8{ "a", "b", "c" };
-    try table.addRow(&row);
-    try table.addRow(&row);
-    try table.addRow(&row);
+    var row1 = [_][]const u8{ "a", "b", "c" };
+    try table.addRow(&row1);
+    var row2 = [_][]const u8{ "1", "2", "3" };
+    try table.addRow(&row2);
+    var row3 = [_][]const u8{ "hello", "world", "!" };
+    try table.addRow(&row3);
 
-    var str = try table.toString(
-        .{
-            .alignment = .Right,
-            .even = false,
-            .outline = true,
-            .rule = true,
-            .padding = .{ .r = 2, .l = 2 },
-            .index = false,
-        },
-    );
+    var str = try table.toString(.{
+        .padding = .{ .l = 1, .r = 1 },
+        .alignment = .Right,
+    });
     defer allocator.free(str);
     std.debug.print("Hello\n{s}", .{str});
 }
