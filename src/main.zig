@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const Row = struct {
+pub const Row = struct {
     const Self = @This();
 
     items: [][]u8,
@@ -50,256 +50,354 @@ const Row = struct {
 
 pub const TableError = error{RowLengthMismatch};
 
-const Table = struct {
-    const Self = @This();
+pub fn TableBase(
+    comptime t_spacer: []const u8,
+    comptime t_middle: []const u8,
+    comptime t_topLeft: []const u8,
+    comptime t_topMiddle: []const u8,
+    comptime t_topRight: []const u8,
+    comptime t_middleLeft: []const u8,
+    comptime t_middleMiddle: []const u8, // (~;
+    comptime t_middleRight: []const u8,
+    comptime t_bottomLeft: []const u8,
+    comptime t_bottomMiddle: []const u8,
+    comptime t_bottomRight: []const u8,
+) type {
+    return struct {
+        const Self = @This();
 
-    pub const Alignment = enum { Left, Center, Right };
+        pub const Alignment = enum { Left, Center, Right };
 
-    headings: Row,
-    rows: std.ArrayList(Row),
-    allocator: std.mem.Allocator,
-    pub fn addRow(self: *Self, row: [][]const u8) !void {
-        // check number of items
-        if (row.len != self.headings.items.len) {
-            return TableError.RowLengthMismatch;
-        }
-
-        var new_row = try Row.init(self.allocator, row);
-        errdefer new_row.deinit();
-        try self.rows.append(new_row);
-    }
-
-    pub fn initWithHeadings(allocator: std.mem.Allocator, headings: [][]const u8) !Self {
-        var rows = std.ArrayList(Row).init(allocator);
-        var hrow = try Row.init(allocator, headings);
-        return .{ .headings = hrow, .rows = rows, .allocator = allocator };
-    }
-
-    pub fn deinit(self: *Self) void {
-        for (self.rows.items) |*row| row.deinit();
-        self.rows.deinit();
-        self.headings.deinit();
-    }
-
-    fn minCellWidth(self: *const Self, col: usize) usize {
-        var max: usize = self.headings.items[col].len;
-        for (self.rows.items) |row| {
-            max = @max(row.items[col].len, max);
-        }
-        return max;
-    }
-
-    fn getColumnSpacings(self: *const Self) ![]usize {
-        var spacings = try self.allocator.alloc(usize, self.headings.items.len);
-        for (spacings, 0..) |*s, i| {
-            s.* = self.minCellWidth(i);
-        }
-        return spacings;
-    }
-
-    pub const Padding = struct {
-        l: usize = 0,
-        r: usize = 0,
-    };
-
-    pub const PrintOptions = struct {
-        alignment: Alignment = .Left,
-        header_alignment: Alignment = .Center,
-        even: bool = false,
-        outline: bool = true,
-        index: bool = false,
-        index_str: []const u8 = "",
-        padding: Padding = .{},
-    };
-    pub fn toString(self: *Self, opts: PrintOptions) ![]u8 {
-        var list: std.ArrayList(u8) = std.ArrayList(u8).init(self.allocator);
-        errdefer list.deinit();
-        var writer = list.writer();
-
-        // are we doing indexing?
-        if (opts.index) {
-            // insert a phony column into each row
-            try self.headings.insertColumn(opts.index_str, 0);
-            var buffer: [1024]u8 = undefined;
-            for (self.rows.items, 1..) |*row, i| {
-                const size = std.fmt.formatIntBuf(&buffer, i, 10, .lower, .{});
-                const i_str = buffer[0..size];
-                try row.insertColumn(i_str, 0);
+        headings: Row,
+        rows: std.ArrayList(Row),
+        allocator: std.mem.Allocator,
+        pub fn addRow(self: *Self, row: [][]const u8) !void {
+            // check number of items
+            if (row.len != self.headings.items.len) {
+                return TableError.RowLengthMismatch;
             }
+
+            var new_row = try Row.init(self.allocator, row);
+            errdefer new_row.deinit();
+            try self.rows.append(new_row);
         }
 
-        // print header column
-        var spacings = try self.getColumnSpacings();
-        defer self.allocator.free(spacings);
-
-        if (opts.even) {
-            // equalize all spacings
-            var max: usize = 0;
-            for (spacings) |s| max = @max(s, max);
-            for (spacings) |*s| s.* = max;
+        pub fn initWithHeadings(allocator: std.mem.Allocator, headings: [][]const u8) !Self {
+            var rows = std.ArrayList(Row).init(allocator);
+            var hrow = try Row.init(allocator, headings);
+            return .{ .headings = hrow, .rows = rows, .allocator = allocator };
         }
 
-        const linelength = 1 + self.headings.items.len + blk: {
-            var sum: usize = 0;
-            for (spacings) |s| sum += s;
-            break :blk sum;
+        pub fn deinit(self: *Self) void {
+            for (self.rows.items) |*row| row.deinit();
+            self.rows.deinit();
+            self.headings.deinit();
+        }
+
+        fn minCellWidth(self: *const Self, col: usize) usize {
+            var max: usize = self.headings.items[col].len;
+            for (self.rows.items) |row| {
+                max = @max(row.items[col].len, max);
+            }
+            return max;
+        }
+
+        fn getColumnSpacings(self: *const Self) ![]usize {
+            var spacings = try self.allocator.alloc(usize, self.headings.items.len);
+            for (spacings, 0..) |*s, i| {
+                s.* = self.minCellWidth(i);
+            }
+            return spacings;
+        }
+
+        pub const Padding = struct {
+            l: usize = 0,
+            r: usize = 0,
         };
 
-        if (opts.outline) {
-            try self.writeTopCap(&writer, spacings, linelength, opts.padding);
-            _ = try writer.write("\n");
-        }
+        pub const PrintOptions = struct {
+            alignment: Alignment = .Left,
+            header_alignment: Alignment = .Center,
+            even: bool = false,
+            outline: bool = true,
+            index: bool = false,
+            rule: bool = true,
+            index_str: []const u8 = "",
+            padding: Padding = .{},
+        };
+        pub fn toString(self: *Self, opts: PrintOptions) ![]u8 {
+            var list: std.ArrayList(u8) = std.ArrayList(u8).init(self.allocator);
+            errdefer list.deinit();
+            var writer = list.writer();
 
-        const delimiter = if (opts.outline) "│" else "";
+            if (opts.index) {
+                // insert a phony column into each row
+                try self.headings.insertColumn(opts.index_str, 0);
+                // integer formatting buffer
+                var buffer: [1024]u8 = undefined;
+                for (self.rows.items, 1..) |*row, i| {
+                    const size = std.fmt.formatIntBuf(&buffer, i, 10, .lower, .{});
+                    const i_str = buffer[0..size];
+                    try row.insertColumn(i_str, 0);
+                }
+            }
 
-        // write the header
-        try self.writeRow(
-            &writer,
-            self.headings,
-            spacings,
-            linelength,
-            delimiter,
-            opts.header_alignment,
-            opts.padding,
-        );
-        _ = try writer.write("\n");
+            // print header column
+            var spacings = try self.getColumnSpacings();
+            defer self.allocator.free(spacings);
 
-        if (opts.outline) {
-            try self.writeSpacer(&writer, spacings, linelength, opts.padding);
-            _ = try writer.write("\n");
-        }
+            if (opts.even) {
+                // equalize all spacings
+                var max: usize = 0;
+                for (spacings) |s| max = @max(s, max);
+                for (spacings) |*s| s.* = max;
+            }
 
-        for (self.rows.items) |row| {
+            const linelength = 1 + self.headings.items.len + blk: {
+                var sum: usize = 0;
+                for (spacings) |s| sum += s;
+                break :blk sum;
+            };
+
+            if (opts.outline) {
+                try self.writeTopCap(&writer, spacings, linelength, opts.padding);
+                _ = try writer.write("\n");
+            } else if (opts.rule) {
+                try self.writeLine(&writer, spacings, linelength, opts.padding);
+                _ = try writer.write("\n");
+            }
+
+            const delimiter = if (opts.outline) t_spacer else " ";
+
+            // write the header
             try self.writeRow(
                 &writer,
-                row,
+                self.headings,
                 spacings,
                 linelength,
                 delimiter,
-                opts.alignment,
+                opts.header_alignment,
                 opts.padding,
             );
             _ = try writer.write("\n");
-        }
 
-        if (opts.outline) {
-            try self.writeBottomCap(&writer, spacings, linelength, opts.padding);
-            _ = try writer.write("\n");
-        }
-
-        return list.toOwnedSlice();
-    }
-
-    fn writeRow(
-        _: *const Self,
-        writer: anytype,
-        row: Row,
-        spacings: []const usize,
-        linelength: usize,
-        spacer: []const u8,
-        alignment: Alignment,
-        padding: Padding,
-    ) !void {
-        _ = linelength;
-        _ = try writer.write(spacer);
-        for (spacings, 0..) |spacing, i| {
-            const entry = row.items[i];
-            var diff = spacing - entry.len;
-
-            // do left padding
-            var p = padding.l;
-            while (p > 0) : (p -= 1) _ = try writer.write(" ");
-
-            switch (alignment) {
-                .Left => {
-                    _ = try writer.write(entry);
-                    while (diff > 0) : (diff -= 1) {
-                        _ = try writer.write(" ");
-                    }
-                },
-                .Right => {
-                    while (diff > 0) : (diff -= 1) {
-                        _ = try writer.write(" ");
-                    }
-                    _ = try writer.write(entry);
-                },
-                .Center => {
-                    const mid = try std.math.divFloor(usize, diff, 2);
-                    while (diff > mid) : (diff -= 1) {
-                        _ = try writer.write(" ");
-                    }
-                    _ = try writer.write(entry);
-                    while (diff > 0) : (diff -= 1) {
-                        _ = try writer.write(" ");
-                    }
-                },
+            if (opts.outline) {
+                try self.writeSpacer(&writer, spacings, linelength, opts.padding);
+                _ = try writer.write("\n");
+            } else if (opts.rule) {
+                try self.writeLine(&writer, spacings, linelength, opts.padding);
+                _ = try writer.write("\n");
             }
 
-            // do right padding
-            p = padding.r;
-            while (p > 0) : (p -= 1) _ = try writer.write(" ");
+            for (self.rows.items) |row| {
+                try self.writeRow(
+                    &writer,
+                    row,
+                    spacings,
+                    linelength,
+                    delimiter,
+                    opts.alignment,
+                    opts.padding,
+                );
+                _ = try writer.write("\n");
+            }
 
+            if (opts.outline) {
+                try self.writeBottomCap(&writer, spacings, linelength, opts.padding);
+                _ = try writer.write("\n");
+            } else if (opts.rule) {
+                try self.writeLine(&writer, spacings, linelength, opts.padding);
+                _ = try writer.write("\n");
+            }
+
+            return list.toOwnedSlice();
+        }
+
+        fn writeRow(
+            _: *const Self,
+            writer: anytype,
+            row: Row,
+            spacings: []const usize,
+            linelength: usize,
+            spacer: []const u8,
+            alignment: Alignment,
+            padding: Padding,
+        ) !void {
+            _ = linelength;
             _ = try writer.write(spacer);
-        }
-    }
+            for (spacings, 0..) |spacing, i| {
+                const entry = row.items[i];
+                var diff = spacing - entry.len;
 
-    fn writeSpacer(
-        self: *const Self,
-        writer: anytype,
-        spacings: []const usize,
-        linelength: usize,
-        padding: Padding,
-    ) !void {
-        try self.writeDelimiters(writer, spacings, linelength, "├", "─", "┤", "┼", padding);
-    }
+                // do left padding
+                var p = padding.l;
+                while (p > 0) : (p -= 1) _ = try writer.write(" ");
 
-    fn writeTopCap(
-        self: *const Self,
-        writer: anytype,
-        spacings: []const usize,
-        linelength: usize,
-        padding: Padding,
-    ) !void {
-        try self.writeDelimiters(writer, spacings, linelength, "┌", "─", "┐", "┬", padding);
-    }
+                switch (alignment) {
+                    .Left => {
+                        _ = try writer.write(entry);
+                        while (diff > 0) : (diff -= 1) {
+                            _ = try writer.write(" ");
+                        }
+                    },
+                    .Right => {
+                        while (diff > 0) : (diff -= 1) {
+                            _ = try writer.write(" ");
+                        }
+                        _ = try writer.write(entry);
+                    },
+                    .Center => {
+                        const mid = try std.math.divFloor(usize, diff, 2);
+                        while (diff > mid) : (diff -= 1) {
+                            _ = try writer.write(" ");
+                        }
+                        _ = try writer.write(entry);
+                        while (diff > 0) : (diff -= 1) {
+                            _ = try writer.write(" ");
+                        }
+                    },
+                }
 
-    fn writeBottomCap(
-        self: *const Self,
-        writer: anytype,
-        spacings: []const usize,
-        linelength: usize,
-        padding: Padding,
-    ) !void {
-        try self.writeDelimiters(writer, spacings, linelength, "└", "─", "┘", "┴", padding);
-    }
+                // do right padding
+                p = padding.r;
+                while (p > 0) : (p -= 1) _ = try writer.write(" ");
 
-    fn writeDelimiters(
-        _: *const Self,
-        writer: anytype,
-        spacings: []const usize,
-        linelength: usize,
-        left: []const u8,
-        mid: []const u8,
-        right: []const u8,
-        seperator: []const u8,
-        padding: Padding,
-    ) !void {
-        _ = try writer.write(left);
-        var i: usize = 0;
-        for (spacings) |spacing| {
-            const width = spacing + padding.l + padding.r;
-            for (0..width) |_| {
-                _ = try writer.write(mid);
+                _ = try writer.write(spacer);
             }
-            i += spacing + 1;
-            if (i == linelength - 1) {
-                _ = try writer.write(right);
-                break;
-            }
-            _ = try writer.write(seperator);
         }
-    }
-};
+
+        fn writeSpacer(
+            self: *const Self,
+            writer: anytype,
+            spacings: []const usize,
+            linelength: usize,
+            padding: Padding,
+        ) !void {
+            try self.writeDelimiters(
+                writer,
+                spacings,
+                linelength,
+                t_middleLeft,
+                t_middle,
+                t_middleRight,
+                t_middleMiddle,
+                padding,
+            );
+        }
+
+        fn writeTopCap(
+            self: *const Self,
+            writer: anytype,
+            spacings: []const usize,
+            linelength: usize,
+            padding: Padding,
+        ) !void {
+            try self.writeDelimiters(
+                writer,
+                spacings,
+                linelength,
+                t_topLeft,
+                t_middle,
+                t_topRight,
+                t_topMiddle,
+                padding,
+            );
+        }
+
+        fn writeLine(
+            self: *const Self,
+            writer: anytype,
+            spacings: []const usize,
+            linelength: usize,
+            padding: Padding,
+        ) !void {
+            try self.writeDelimiters(
+                writer,
+                spacings,
+                linelength,
+                t_middle,
+                t_middle,
+                t_middle,
+                t_middle,
+                padding,
+            );
+        }
+
+        fn writeBottomCap(
+            self: *const Self,
+            writer: anytype,
+            spacings: []const usize,
+            linelength: usize,
+            padding: Padding,
+        ) !void {
+            try self.writeDelimiters(
+                writer,
+                spacings,
+                linelength,
+                t_bottomLeft,
+                t_middle,
+                t_bottomRight,
+                t_bottomMiddle,
+                padding,
+            );
+        }
+
+        fn writeDelimiters(
+            _: *const Self,
+            writer: anytype,
+            spacings: []const usize,
+            linelength: usize,
+            left: []const u8,
+            mid: []const u8,
+            right: []const u8,
+            seperator: []const u8,
+            padding: Padding,
+        ) !void {
+            _ = try writer.write(left);
+            var i: usize = 0;
+            for (spacings) |spacing| {
+                const width = spacing + padding.l + padding.r;
+                for (0..width) |_| {
+                    _ = try writer.write(mid);
+                }
+                i += spacing + 1;
+                if (i == linelength - 1) {
+                    _ = try writer.write(right);
+                    break;
+                }
+                _ = try writer.write(seperator);
+            }
+        }
+    };
+}
+
+pub const Table = TableBase(
+    "│",
+    "─",
+    "┌",
+    "┬",
+    "┐",
+    "├",
+    "┼",
+    "┤",
+    "└",
+    "┴",
+    "┘",
+);
+
+pub const AsciiTable = TableBase(
+    "|",
+    "-",
+    "+",
+    "+",
+    "+",
+    "+",
+    "+",
+    "+",
+    "+",
+    "+",
+    "+",
+);
 
 test "basic-operations" {
     const allocator = std.testing.allocator;
@@ -317,9 +415,10 @@ test "basic-operations" {
         .{
             .alignment = .Right,
             .even = false,
-            .outline = false,
+            .outline = true,
+            .rule = true,
             .padding = .{ .r = 2, .l = 2 },
-            .index = true,
+            .index = false,
         },
     );
     defer allocator.free(str);
