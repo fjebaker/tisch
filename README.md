@@ -45,7 +45,7 @@ Alignment:
 ```zig
 var str = try table.toString(.{
     .padding = .{ .l = 1, .r = 1 },
-    .alignment = .Left,
+    .alignment = .Right,
 });
 ```
 
@@ -53,9 +53,9 @@ var str = try table.toString(.{
 ┌───────────┬───────┬───────────┐
 │ Heading 1 │   2   │ Heading 3 │
 ├───────────┼───────┼───────────┤
-│ a         │ b     │ c         │
-│ 1         │ 2     │ 3         │
-│ hello     │ world │ !         │
+│         a │     b │         c │
+│         1 │     2 │         3 │
+│     hello │ world │         ! │
 └───────────┴───────┴───────────┘
 ```
 
@@ -64,7 +64,6 @@ Equal widths:
 ```zig
 var str = try table.toString(.{
     .padding = .{ .l = 1, .r = 1 },
-    .alignment = .Left,
     .even = true,
 });
 ```
@@ -84,7 +83,6 @@ Outlines:
 ```zig
 var str = try table.toString(.{
     .padding = .{ .l = 1, .r = 1 },
-    .alignment = .Left,
     .even = true,
     .outline = false,
 });
